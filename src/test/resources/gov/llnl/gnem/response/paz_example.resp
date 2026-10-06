@@ -1,0 +1,13 @@
+# Displacement response for S-13 short-period seismometer
+#
+#
+#
+ theoretical  0   instrument    paz 
+0.375E+02
+2
+-4.335398  -4.547829  0.0  0.0
+-4.335398   4.547829  0.0  0.0
+3
+0.000000    0.000000  0.0  0.0
+0.000000    0.000000  0.0  0.0
+0.000000    0.000000  0.0  0.0

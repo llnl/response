@@ -35,7 +35,7 @@ public class ChannelMatchPolicy implements Serializable {
     private static final long serialVersionUID = 6639216586376908870L;
 
     public static enum Policy {
-        NO_MATCH_REQUIRED, FULL_MATCH, STA_CHAN_EPOCH_MATCH, NET_STA_CHAN_EPOCH_MATCH, AGENCY_NET_STA_CHAN_LOCID_EPOCH_MATCH, NET_STA_CHAN_LOCID_EPOCH_MATCH, NET_STA_CHAN_MATCH
+        NO_MATCH_REQUIRED, FULL_MATCH, STA_CHAN_EPOCH_MATCH, NET_STA_CHAN_EPOCH_MATCH, AGENCY_NET_STA_CHAN_LOCID_EPOCH_MATCH, NET_STA_CHAN_LOCID_EPOCH_MATCH, NET_STA_CHAN_MATCH, STA_CHAN_MATCH
     }
 
     private final boolean matchAgency;
@@ -154,6 +154,15 @@ public class ChannelMatchPolicy implements Serializable {
         case NET_STA_CHAN_MATCH:
             matchAgency = false;
             matchNet = true;
+            matchNetJdate = false;
+            matchSta = true;
+            matchChannel = true;
+            matchLocationCode = false;
+            matchEpoch = false;
+            break;
+        case STA_CHAN_MATCH:
+            matchAgency = false;
+            matchNet = false;
             matchNetJdate = false;
             matchSta = true;
             matchChannel = true;

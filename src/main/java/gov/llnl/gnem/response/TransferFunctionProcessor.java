@@ -143,7 +143,7 @@ public class TransferFunctionProcessor {
 
             switch (fromType) {
                 case SACPZF: {
-                    TransferData result = sacTransfer.getFromTransferFunction(nsamp, roundedRate, time, sta, chan, rmd);
+                    TransferData result = sacTransfer.getFromTransferFunction(nsamp, roundedRate, time, rmd);
                      CachedResponseHolder.getInstance().cacheForwardTransferFunction(key, result);
                     return result;
                 }

@@ -5,7 +5,7 @@
  *  This work was performed under the auspices of the U.S. Department of Energy
  *  by Lawrence Livermore National Laboratory under Contract DE-AC52-07NA27344.
  * %%
- * Copyright (C) 2023 Lawrence Livermore National Laboratory
+ * Copyright (C) 2025 Lawrence Livermore National Laboratory
  * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1073,16 +1073,13 @@ public class OutputGenerator {
             boolean evalFlag;
             for (int fIdx = 0; fIdx < numFreq; ++fIdx) { //for each frequency value
                 freqVal = freqArray[fIdx];
+                if (freqVal <= 0) {
+                    continue;
+                }
                 wVal = TWO_PI * freqVal;
                 for (stageNum = startStageNum; stageNum <= stopStageNum; ++stageNum) { //for each stage in desired range
                     cNum.real = 1.0;
                     cNum.imag = 0.0;
-                    //          if(XDEBUG_FLAG)
-                    //          {        //send debug message to default log file
-                    //            LogFile.getGlobalLogObj().debug(
-                    //                          "Calculating response of stage #" + (stageNum+1) +
-                    //                                                " at frequency " + freqVal);
-                    //          }
                     stageObj = respObj.stages[stageNum];
                     if (stageObj.filters != null && stageObj.filters.length > 0) { //stage contains filters (not a gain-only stage)
                         if (stageObj.the_normalization != null && stageObj.the_normalization.length > 0 && stageObj.the_normalization[0] != null) { //stage contains normalization; save value

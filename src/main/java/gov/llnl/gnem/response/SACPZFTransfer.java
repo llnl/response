@@ -10,9 +10,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.StringTokenizer;
+
 import org.apache.commons.math3.complex.Complex;
 
 import com.isti.jevalresp.ResponseUnits;
@@ -39,8 +40,7 @@ import com.isti.jevalresp.ResponseUnits;
  */
 public class SACPZFTransfer {
 
-    public TransferData getFromTransferFunction(int nsamp, double samprate, double time, String sta, String chan, ResponseMetaData metadata)
-            throws IOException {
+    public TransferData getFromTransferFunction(int nsamp, double samprate, double time, ResponseMetaData metadata) throws IOException {
 
         /*
          * - Set up scratch space for TRANSFER subroutine. It needs four DOUBLE PRECISION arrays,two for the ffts that
@@ -57,13 +57,13 @@ public class SACPZFTransfer {
         double delfrq = 1.0 / (nfft * delta);
         ResponseType fromType = metadata.getRsptype();
 
-        computeTransferFunctionFromFile(nfreq, delfrq, time, xre, xim, fromType, metadata.getFilename(), sta, chan);
+        computeTransferFunctionFromFile(nfreq, delfrq, time, xre, xim, fromType, metadata.getFilename());
 
         return TransferFunctionUtils.packageTransferFunctionSamples(delfrq, xre, xim, new ResponseUnits(), metadata);
     }
 
-    public static void computeTransferFunctionFromFile(int nfreq, double delfrq, double epoch, double[] xre, double[] xim, ResponseType type, String responseFileName,
-            String inSta, String inChan) throws IOException {
+    public static void computeTransferFunctionFromFile(int nfreq, double delfrq, double epoch, double[] xre, double[] xim, ResponseType type, String responseFileName)
+            throws IOException {
         /*
          * Branching routine to apply the individual instrument responses.
          */
@@ -72,11 +72,11 @@ public class SACPZFTransfer {
             xim[idx] = 0.0e0;
         }
         switch (type) {
-            case SACPZF:
-                polezero(delfrq, xre, xim, responseFileName);
-                break;
-            default:
-                throw new IllegalStateException("Unhandled type: " + type);
+        case SACPZF:
+            polezero(delfrq, xre, xim, responseFileName);
+            break;
+        default:
+            throw new IllegalStateException("Unhandled type: " + type);
         }
 
     }
@@ -86,7 +86,7 @@ public class SACPZFTransfer {
         TransferFunctionUtils.getran(delfrq, pzd, xre, xim);
     }
 
-    private static PoleZeroData getPoleZeroDataFromFile(String poleZeroFile) throws NumberFormatException, FileNotFoundException {
+    public static PoleZeroData getPoleZeroDataFromFile(String poleZeroFile) throws NumberFormatException, FileNotFoundException {
         double constant;
         /*
         * - Set default values for constant, poles, and zeros.
@@ -107,6 +107,7 @@ public class SACPZFTransfer {
         int nzeros = 0;
         boolean inZerosSection = false;
         for (String line : lines) {
+            line = line.toUpperCase();
             StringTokenizer tokenizer = new StringTokenizer(line);
             if (tokenizer.countTokens() == 2) {
                 String first = tokenizer.nextToken();
@@ -139,6 +140,7 @@ public class SACPZFTransfer {
 
         boolean inPolesSection = false;
         for (String line : lines) {
+            line = line.toUpperCase();
             StringTokenizer tokenizer = new StringTokenizer(line);
             if (tokenizer.countTokens() == 2) {
                 String first = tokenizer.nextToken();
@@ -170,10 +172,8 @@ public class SACPZFTransfer {
         // Get constant
         for (String line : lines) {
             StringTokenizer tokenizer = new StringTokenizer(line);
-            if (tokenizer.hasMoreTokens()) {
-                if (tokenizer.nextToken().equalsIgnoreCase("CONSTANT")) {
-                    constant = Double.parseDouble(tokenizer.nextToken());
-                }
+            if (tokenizer.hasMoreTokens() && tokenizer.nextToken().equalsIgnoreCase("CONSTANT")) {
+                constant = Double.parseDouble(tokenizer.nextToken());
             }
         }
         return constant;
@@ -182,7 +182,7 @@ public class SACPZFTransfer {
     private static String[] readAllLines(String poleZeroFile) throws FileNotFoundException {
         ArrayList<String> tmp = new ArrayList<>();
         File file = new File(poleZeroFile);
-        try ( Scanner sc = new Scanner(file)) {
+        try (Scanner sc = new Scanner(file)) {
             while (sc.hasNextLine()) {
                 tmp.add(sc.nextLine());
             }

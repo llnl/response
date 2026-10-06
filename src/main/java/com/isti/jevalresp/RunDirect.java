@@ -228,6 +228,7 @@ public class RunDirect extends Run {
      * @param stopStageNum if greater than zero then the end of the range of
      * stage sequence numbers to use, otherwise only the single stage specified
      * by 'startStageNum' is used.
+     * @param policy
      * @param stdioFlag true for input from 'stdin', false for input from file.
      * @return An 'OutputGenerator' object, or null if an error occurred (in
      * which case 'getErrorMessage()' may be used to fetch information about the
@@ -246,7 +247,7 @@ public class RunDirect extends Run {
             ChannelMatchPolicy policy) {
         return processOneResponse(stationStr, channelStr, networkStr, siteStr,
                 dateObj, outUnitsConvIdx, fileNameParam, freqArr, startStageNum,
-                stopStageNum, false, false, false, 0.0, false, false, 1.0,policy);
+                stopStageNum, false, true, true, 0.0, false, false, 1.0,policy);
     }
 
 

@@ -33,8 +33,10 @@ import com.isti.jevalresp.ComplexBlk;
 import com.isti.jevalresp.OutputGenerator;
 import com.isti.jevalresp.ResponseUnits;
 import com.isti.jevalresp.RunDirect;
+import java.util.Arrays;
 
 import java.util.Date;
+import java.util.Objects;
 
 /**
  *
@@ -65,7 +67,7 @@ public class EvalResp {
 
         SimpleEntry<ComplexBlk[], ResponseUnits> pair = computeResponseSpectrum(netCode, inSta, inChan, locid, metadata.getFilename(), policy, epoch, units, freqs);
 
-        fillArrays(nfreq, pair.getKey(), xre, xim);
+        fillArrays(pair.getKey(), xre, xim);
         return TransferFunctionUtils.packageTransferFunctionSamples(delfrq, xre, xim, pair.getValue(), metadata);
     }
 
@@ -105,15 +107,24 @@ public class EvalResp {
         }
         respOutput.calculateResponse(freqs, false, units.getEvrespCode(), startStage, stopStage);
         ComplexBlk[] cspectra = respOutput.getCSpectraArray();
+        cspectra[0] = new ComplexBlk(0, 0); // Nolonger computing transfer function for the zero-frequency
         ResponseUnits inputUnits = respOutput.getInputUnits();
         return new SimpleEntry<>(cspectra, inputUnits);
 
     }
 
-    private static void fillArrays(int nfreqs, ComplexBlk[] cspectra, double[] xre, double[] xim) {
-        for (int i = 0; i < nfreqs; i++) {
-            xre[i] = cspectra[i].real;
-            xim[i] = cspectra[i].imag;
+    private static void fillArrays(ComplexBlk[] cspectra, double[] xre, double[] xim) {
+        Arrays.fill(xre, 0.0);
+        Arrays.fill(xim, 0.0);
+        for (int i = 0; i < cspectra.length; i++) {
+            ComplexBlk blk = cspectra[i];
+            if (!Objects.isNull(blk)) {
+                xre[i] = blk.real;
+                xim[i] = blk.imag;
+            } else {
+                xre[i] = 0.0;
+                xim[i] = 0.0;
+            }
         }
     }
 

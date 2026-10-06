@@ -100,6 +100,7 @@ public class TransferFunctionUtils {
             double denr = fromSamp.multiply(fromSamp.conjugate()).abs(); // Compute water level
             Complex tmp = denr <= Float.MIN_NORMAL ? zero : one.divide(fromSamp); // Divide by transfer function value or set to zero
             double freq = i * delfrq;
+            // original code multiplies by delfrq here.
             double fac = limits != null ? taper(freq, limits.getLowpass(), limits.getLowcut()) * taper(freq, limits.getHighpass(), limits.getHighcut()) : 1.0;
             Complex toMultiplier = toTransferFunctionSamples != null ? toTransferFunctionSamples[i] : one;
             inverse[i] = tmp.multiply(fac).multiply(toMultiplier); // Apply taper and maybe sample from toTransfer function.

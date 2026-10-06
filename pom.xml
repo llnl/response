@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<groupId>gov.llnl.gnem</groupId>
-	<artifactId>response</artifactId>
-	<version>1.0</version>
-	<name>LLNL2 Response Processing</name>
-	<url>http://www.llnl.gov</url>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>gov.llnl.gnem</groupId>
+    <artifactId>response</artifactId>
+    <version>1.0.2</version>
+    <name>LLNL2 Response Processing</name>
+    <url>http://www.llnl.gov</url>
 
 	<organization>
 		<name>Lawrence Livermore National Laboratory (LLNL)</name>
@@ -16,41 +16,41 @@
 
 	<packaging>jar</packaging>
 	<properties>
-		<maven.compiler.source>1.8</maven.compiler.source>
-		<maven.compiler.target>1.8</maven.compiler.target>
-
+		<maven.compiler.release>11</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-		<maven.compiler.plugin.version>3.10.1</maven.compiler.plugin.version>
-		<maven.dependency.plugin.version>3.5.0</maven.dependency.plugin.version>
-		<maven.jar.plugin.version>3.3.0</maven.jar.plugin.version>
+		<maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
+		<maven.dependency.plugin.version>3.8.1</maven.dependency.plugin.version>
+		<maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
 		<maven.resources.plugin.version>3.3.0</maven.resources.plugin.version>
-		<maven.source.plugin.version>3.2.1</maven.source.plugin.version>
+		<maven.source.plugin.version>3.3.1</maven.source.plugin.version>
 		<maven.shade.plugin.version>3.4.1</maven.shade.plugin.version>
-		<license-maven-plugin.version>1.20</license-maven-plugin.version>
-
+		<license-maven-plugin.version>2.6.0</license-maven-plugin.version>
 		<regexp.version>1.1.4</regexp.version>
 		<fissuresidl.version>1.0.1</fissuresidl.version>
 		<fissuresimpl.version>1.1.13</fissuresimpl.version>
 		<seis-file.version>2.0.5</seis-file.version>
-		<iris-ws.version>2.20.1</iris-ws.version>
+		<unit-api.version>2.0</unit-api.version> 
 		<unit-ri.version>1.0.3</unit-ri.version>
 		<systems-quantity.version>2.1</systems-quantity.version>
 		<systems-common.version>2.1</systems-common.version>
 		<commons-jcs.version>2.2.1</commons-jcs.version>
 		<glassfish-corba-omgapi.version>4.2.4</glassfish-corba-omgapi.version>
-		<commons-lang.version>3.12.0</commons-lang.version>
+		<commons-lang.version>3.20.0</commons-lang.version>
 		<commons-math.version>3.6.1</commons-math.version>
 		<oregondsp.version>2.2.1</oregondsp.version>
-		<junit.version>4.13.2</junit.version>
+		<junit.version>5.8.1</junit.version>
+		<slf4j.version>2.0.16</slf4j.version>
 	</properties>
 
+	<repositories>
+		<repository>
+			<id>project-local-lib</id>
+			<url>file://${project.basedir}/vendor</url>
+		</repository>
+	</repositories>
+
 	<dependencies>
-		<dependency>
-			<groupId>gnu-regexp</groupId>
-			<artifactId>gnu-regexp</artifactId>
-			<version>${regexp.version}</version>
-		</dependency>
 		<dependency>
 			<groupId>edu.iris</groupId>
 			<artifactId>FissuresIDL</artifactId>
@@ -62,14 +62,9 @@
 			<version>${fissuresimpl.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>edu.sc.seis</groupId>
-			<artifactId>seisFile</artifactId>
-			<version>${seis-file.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>edu.iris.dmc</groupId>
-			<artifactId>IRIS-WS</artifactId>
-			<version>${iris-ws.version}</version>
+			<groupId>javax.measure</groupId>
+			<artifactId>unit-api</artifactId>
+			<version>${unit-api.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>tec.units</groupId>
@@ -116,12 +111,16 @@
 			<version>${oregondsp.version}</version>
 			<type>jar</type>
 		</dependency>
-
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
 			<version>${junit.version}</version>
-			<type>jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -133,9 +132,7 @@
 				<version>${maven.compiler.plugin.version}</version>
 				<configuration>
 					<fork>true</fork>
-					<compilerVersion>${maven.compiler.target}</compilerVersion>
-					<source>${maven.compiler.source}</source>
-					<target>${maven.compiler.target}</target>
+					<release>${maven.compiler.release}</release>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -182,51 +179,20 @@
 				</configuration>
 			</plugin>
 
-			<!-- create uber-jar so we can execute java -cp with our one
-			produced 
-            jar -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>${maven.shade.plugin.version}</version>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<configuration>
-							<filters>
-								<filter>
-									<artifact>*:*</artifact>
-									<excludes>
-										<exclude>META-INF/*.SF</exclude>
-										<exclude>META-INF/*.DSA</exclude>
-										<exclude>META-INF/*.RSA</exclude>
-									</excludes>
-								</filter>
-							</filters>
-							<!--Additional configuration. -->
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
 			<!-- Provides the capability to query pom for 3rd party dependencies -->
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>license-maven-plugin</artifactId>
 				<version>${license-maven-plugin.version}</version>
 				<configuration>
-					<!-- There are other options available as this tool can add
-					license 
-                    headers to your files -->
 					<addJavaLicenseAfterPackage>false</addJavaLicenseAfterPackage>
 					<failOnMissingHeader>false</failOnMissingHeader>
 					<failOnNotUptodateHeader>false</failOnNotUptodateHeader>
 					<inceptionYear>2023</inceptionYear>
 					<organizationName>Lawrence Livermore National Laboratory</organizationName>
 					<licenseName>apache_v2</licenseName>
-					<descriptionTemplate>${basedir}/src/license/DescriptionTemplate.ftl</descriptionTemplate>
+					<descriptionTemplate>
+						${basedir}/src/license/DescriptionTemplate.ftl</descriptionTemplate>
 				</configuration>
 				<executions>
 					<execution>
@@ -256,5 +222,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

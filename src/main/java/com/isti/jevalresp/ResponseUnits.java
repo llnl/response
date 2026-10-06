@@ -108,6 +108,8 @@ public class ResponseUnits implements Serializable {
     public final static Unit<Dimensionless> STRAIN = new AlternateUnit(ONE, "strain");
     public final static Unit<Dimensionless> VOLUMETRIC_STRAIN = new AlternateUnit(ONE, "vstrain");
     public final static Unit<Dimensionless> MICRO_STRAIN = MetricPrefix.MICRO(ResponseUnits.STRAIN);
+    public final static Unit<Dimensionless> NANO_STRAIN = MetricPrefix.NANO(ResponseUnits.STRAIN);
+    public final static Unit<Pressure> MICRO_PASCAL = MetricPrefix.MICRO(PASCAL);
     public final static Unit<Pressure> BAR = MetricPrefix.KILO(MetricPrefix.HECTO(PASCAL));
     public final static Unit<Pressure> MILLIBAR = MetricPrefix.HECTO(PASCAL);
 
@@ -145,8 +147,10 @@ public class ResponseUnits implements Serializable {
         SimpleUnitFormat.getInstance().label(NANOMETER_PER_SQUARE_SECOND, "nm/s^2");
         SimpleUnitFormat.getInstance().label(NANOMETER, "nm");
         SimpleUnitFormat.getInstance().label(MICRO_STRAIN, "microstrain");
+        SimpleUnitFormat.getInstance().label(NANO_STRAIN, "nanostrain");
         SimpleUnitFormat.getInstance().label(MICRON, "micron");
         SimpleUnitFormat.getInstance().label(PICO_METRE, "pm");
+        SimpleUnitFormat.getInstance().label(MICRO_PASCAL, "uPa");
         SimpleUnitFormat.getInstance().label(CELSIUS, "degC");
         SimpleUnitFormat.getInstance().label(METRE_PER_SQUARE_SECOND, "m/s^2");
         SimpleUnitFormat.getInstance().label(WATT_PER_SQUARE_METRE, "W/m^2");
@@ -217,6 +221,7 @@ public class ResponseUnits implements Serializable {
             METRE_PER_SQUARE_SECOND, //
             MetricPrefix.MILLI(RADIAN), //
             MICRO_STRAIN, MICRON, //
+            NANO_STRAIN,
             PICO_METRE, //
             ResponseUnits.MILLIBAR, ResponseUnits.MILLIMETER_PER_HOUR, //
             MetricPrefix.MILLI(PASCAL), //
@@ -260,7 +265,7 @@ public class ResponseUnits implements Serializable {
         inputUnits = new AlternateUnit(ONE, "unknown");
     }
 
-    ResponseUnits(ResponseUnits units) {
+    public ResponseUnits(ResponseUnits units) {
         unitsStatus = units.unitsStatus;
         unitObj = units.unitObj;
         inputUnits = units.inputUnits;
@@ -316,11 +321,6 @@ public class ResponseUnits implements Serializable {
         return "ResponseUnits{" + "inputUnits=" + inputUnits + ", unitObj=" + unitObj + ", unitsStatus=" + unitsStatus + '}';
     }
 
-    public static void main(String[] args) {
-        String tmp = "m/s";
-        Unit<?> likelyUnits = ResponseUnits.parse(tmp);
-        System.out.println(likelyUnits);
-    }
 
     public static double getScaleFactor(Unit<?> inUnit, Unit<?> outUnit) {
 

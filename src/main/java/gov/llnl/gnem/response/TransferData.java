@@ -155,7 +155,7 @@ public class TransferData {
         unitConversionScaleFactor = 1.0;
         conversionType = ConversionType.None;
         appliedCalib = null;
-        maybeScaleResponse();
+        maybeScaleResponse();  //possibly scale by wfdisc CALIB or by nominal CALIB
     }
 
     /**
@@ -364,6 +364,68 @@ public class TransferData {
         }
     }
 
+    public void writeFAPFile(String filename, String unit) throws FileNotFoundException {
+        double[] freq = new double[workingData.length];
+        double[] amp = new double[workingData.length];
+        double[] phase = new double[workingData.length];
+        for (int j = 0; j < workingData.length; ++j) {
+            freq[j] = j * delfreq;
+            amp[j] = workingData[j].abs();
+            phase[j] = workingData[j].getArgument();
+
+        }
+        phase = unwrap(phase);
+        for (int j = 0; j < phase.length; ++j) {
+            phase[j] = Math.toDegrees(phase[j]);
+        }
+        try (PrintWriter pw = new PrintWriter(filename)) {
+            pw.println("# Freq(Hz)     Amp(counts/"+unit+")   Phase(deg)   Error(amp)  Error(phase)");
+            pw.println("#");
+            pw.println(" theoretical   0   instrument   fap");
+            pw.println(phase.length - 1);
+            for (int j = 1; j < phase.length; ++j) {
+                String line = String.format("%10.6f  %16.9f  %12.6f      0.0     0.0", freq[j], amp[j], phase[j]);
+                pw.println(line);
+            }
+        }
+    }
+
+
+    /**
+     * Unwraps a 1D array of phase angles. The algorithm assumes that the
+     * absolute difference between consecutive angles is less than a certain
+     * tolerance (default: Math.PI).
+     *
+     * @param wrappedPhase The input array of wrapped phase angles in radians.
+     * @return The unwrapped phase array.
+     */
+    private static double[] unwrap(double[] wrappedPhase) {
+        if (wrappedPhase == null || wrappedPhase.length < 2) {
+            return wrappedPhase;
+        }
+
+        double[] unwrappedPhase = new double[wrappedPhase.length];
+        unwrappedPhase[0] = wrappedPhase[0];
+
+        for (int i = 1; i < wrappedPhase.length; i++) {
+            double phaseDiff = wrappedPhase[i] - wrappedPhase[i - 1];
+
+            // Correct phase jumps greater than Math.PI
+            if (phaseDiff > Math.PI) {
+                unwrappedPhase[i] = wrappedPhase[i] - 2 * Math.PI;
+            } else if (phaseDiff < -Math.PI) {
+                unwrappedPhase[i] = wrappedPhase[i] + 2 * Math.PI;
+            } else {
+                unwrappedPhase[i] = wrappedPhase[i];
+            }
+
+            // Keep adding previous unwrapped value to maintain continuity
+            unwrappedPhase[i] += unwrappedPhase[i - 1] - wrappedPhase[i - 1];
+        }
+
+        return unwrappedPhase;
+    }
+
     public Double getAmplitudeAtWfdiscCalper() {
         return amplitudeAtWfdiscCalper;
     }
@@ -386,7 +448,7 @@ public class TransferData {
 
     private void maybeScaleResponse() {
         double maxFreq = (originalData.length - 1) * delfreq;
-        if (metadata.hasWfdiscCalibration()) {
+        if (metadata.hasFullWfdiscCalibration()) {
             double calFreq = 1.0 / metadata.getWfdiscCalper();
             if (calFreq < maxFreq) {
                 appliedCalib = metadata.getWfdiscCalib(); // Units of CALIB are nm/COUNT.
@@ -409,7 +471,14 @@ public class TransferData {
                     appliedScaling = AppliedScaling.ScaledByWfdiscCalib;
                 }
             }
-        } else if (metadata.hasNominalCalibration()) {
+        } else if (metadata.hasWfdiscCalibration()) {
+            appliedCalib = metadata.getWfdiscCalib();
+            for (int j = 0; j < originalData.length; ++j) {
+                workingData[j] = originalData[j].divide(appliedCalib);
+            }
+            appliedScaling = AppliedScaling.ScaledByWfdiscCalib;
+
+        } else if (metadata.hasFullNominalCalibration()) {
             double calFreq = 1.0 / metadata.getNominalCalper();
             if (calFreq < maxFreq) {
                 appliedCalib = metadata.getNominalCalib(); // Units of CALIB are nm/COUNT.
@@ -427,6 +496,12 @@ public class TransferData {
                     appliedScaling = AppliedScaling.ScaledByNominalCalib;
                 }
             }
+        } else if (metadata.hasNominalCalib()) {
+            appliedCalib = metadata.getNominalCalib();
+            for (int j = 0; j < originalData.length; ++j) {
+                workingData[j] = originalData[j].divide(appliedCalib);
+            }
+            appliedScaling = AppliedScaling.ScaledByNominalCalib;
         }
     }
 
@@ -626,6 +701,7 @@ public class TransferData {
                 data[i] = data[i].multiply(jOmega.multiply(jOmega)).divide(unitConversionScaleFactor);
             }
             conversionType = ConversionType.differentiateTwice;
+            //TODO: Ask Doug if workingUnits.getUnitObj() is appropriate - these disagree with requested 
             convertedUnits = new ResponseUnits(requested, workingUnits.getUnitObj(), UnitsStatus.QUANTITY_AND_UNITS);
             workingUnits = convertedUnits;
             workingData = data;
@@ -730,6 +806,5 @@ public class TransferData {
     public String toString() {
         return "TransferData{" + "originalData=" + originalData + ", workingData=" + workingData + ", convertedData=" + convertedData + ", delfreq=" + delfreq + ", originalUnits=" + originalUnits + ", forcedUnits=" + forcedUnits + ", convertedUnits=" + convertedUnits + ", workingUnits=" + workingUnits + ", metadata=" + metadata + ", amplitudeAtWfdiscCalper=" + amplitudeAtWfdiscCalper + ", normalizationStatus=" + normalizationStatus + ", appliedScaleFactor=" + appliedScaleFactor + ", amplitudeAtNominalCalper=" + amplitudeAtNominalCalper + ", appliedScaling=" + appliedScaling + ", unitConversionScaleFactor=" + unitConversionScaleFactor + ", conversionType=" + conversionType + ", appliedCalib=" + appliedCalib + '}';
     }
-
 
 }

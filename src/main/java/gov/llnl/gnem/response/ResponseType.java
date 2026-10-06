@@ -39,7 +39,7 @@ package gov.llnl.gnem.response;
 public enum ResponseType {
 
     EVRESP("evresp"), SACPZF("sacpzf"), PAZ("paz"), FAP("fap"), PAZFIR(
-                    "pazfir"),PAZFAP("pazfap"), FIRFAP("firfap"),CSS("css");
+            "pazfir"), PAZFAP("pazfap"), FIRFAP("firfap"), CSS("css"), UNKNOWN("unknown");
 
     private final String dbValue;
 
@@ -55,10 +55,26 @@ public enum ResponseType {
         return dbValue;
     }
 
+    public static boolean isCssType(ResponseType type) {
+        switch (type) {
+            case PAZ:
+            case FAP:
+            case PAZFIR:
+            case FIRFAP:
+            case PAZFAP:
+            case CSS:
+                return true;
+            default:
+                return false;
+        }
+
+    }
+
     /**
-     * Utility method to convert a String representation of the response type. This methods supports aliases in addition
-     * to the 'name' for some of the ResponseTypes.
-     * 
+     * Utility method to convert a String representation of the response type.
+     * This methods supports aliases in addition to the 'name' for some of the
+     * ResponseTypes.
+     *
      * @param type String representing the response type
      * @return ResponseType enum
      */
@@ -86,6 +102,8 @@ public enum ResponseType {
                 return ResponseType.PAZFAP;
             case "css":
                 return ResponseType.CSS;
+            case "unknown":
+                return ResponseType.UNKNOWN;
             default:
                 throw new IllegalStateException("Unrecognized response type " + type);
         }

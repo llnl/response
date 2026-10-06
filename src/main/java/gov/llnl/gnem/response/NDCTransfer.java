@@ -10,9 +10,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,21 +20,40 @@
  * limitations under the License.
  * #L%
  */
-
 package gov.llnl.gnem.response;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.apache.commons.math3.complex.Complex;
 
 import com.isti.jevalresp.ResponseUnits;
+import com.isti.jevalresp.UnitsStatus;
+
+import edu.iris.Fissures.IfNetwork.CoefficientErrored;
+import edu.iris.Fissures.IfNetwork.CoefficientFilter;
+import edu.iris.Fissures.IfNetwork.ComplexNumberErrored;
+import edu.iris.Fissures.IfNetwork.Decimation;
+import edu.iris.Fissures.IfNetwork.Filter;
+import edu.iris.Fissures.IfNetwork.Gain;
+import edu.iris.Fissures.IfNetwork.ListFilter;
+import edu.iris.Fissures.IfNetwork.Normalization;
+import edu.iris.Fissures.IfNetwork.PoleZeroFilter;
+import edu.iris.Fissures.IfNetwork.Stage;
+import edu.iris.Fissures.IfNetwork.TransferType;
+import edu.iris.Fissures.model.QuantityImpl;
+import edu.iris.Fissures.model.SamplingImpl;
+import edu.iris.Fissures.model.TimeInterval;
+import edu.iris.Fissures.model.UnitImpl;
 
 /**
  *
@@ -42,8 +61,9 @@ import com.isti.jevalresp.ResponseUnits;
  */
 public class NDCTransfer {
 
+    protected static final String NUMBER = "^([\\+\\-])?(\\d)*(\\.)?(\\d)+([eE])?([\\+\\-])?(\\d)*";
     private static final double TWOPI = 2 * Math.PI;
- 
+
     public TransferData getFromTransferFunction(int nsamp, double samprate, double time, ResponseMetaData metadata) throws IOException {
         int nfft = TransferFunctionUtils.next2(nsamp);
         int nfreq = nfft / 2 + 1;
@@ -74,6 +94,7 @@ public class NDCTransfer {
             case PAZ:
             case FAP:
             case PAZFIR:
+            case PAZFAP:
                 transfer(filename, delfrq, nfreq, xre, xim);
                 break;
             default:
@@ -91,49 +112,24 @@ public class NDCTransfer {
             cascade[i] = new Polar(0.0, 1.0);
         }
 
-        Scanner sc = new Scanner(new File(filename));
-        Double isr = null;
-        while (sc.hasNextLine()) {
-            String line = sc.nextLine();
-            if (line == null || line.trim().isEmpty()) {
-                continue;
+        List<GroupStage> stages = computeGroupStagesFromFile(new File(filename));
+
+        for (GroupStage stage : stages) {
+            Polar[] result = new Polar[0];
+            if (stage.getPaz() != null) {
+                result = processPaz(nfr, startFrequency, endFrequency, stage.getPaz());
+            } else if (stage.getFap() != null) {
+                result = doFap(nfr, startFrequency, endFrequency, stage.getFap());
+            } else if (stage.getFir() != null) {
+                result = doFir(nfr, startFrequency, endFrequency, stage.getFir());
             }
-            if (line.charAt(0) != '#') {
-                if (line.contains("theoretical") || line.contains("measured")) {
-                    Polar[] result = new Polar[0];
-                    if (line.contains("paz")) {
-                        result = processNDCpaz(sc, result, nfr, startFrequency, endFrequency);
-                    } else if (line.contains("PAZ2")) {
-                        result = processIDCpaz(line, sc, result, nfr, startFrequency, endFrequency);
-                    } else if (line.contains("fap")) {
-                        Fap[] faps = readFap(sc);
-                        result = doFap(nfr, startFrequency, endFrequency, faps);
-                    } else if (line.contains("FAP2")) {
-                        Fap[] faps = readIDCFap(line, sc);
-                        result = doFap(nfr, startFrequency, endFrequency, faps);
-                    } else if (line.contains("fir")) {
-                        Fir fir = readFir(sc);
-                        result = doFir(nfr, startFrequency, endFrequency, fir);
-                    } else if (line.contains("DIG2")) {
-                        isr = processDig2Line(line);
-                        continue;
-                    } else if (line.contains("FIR2")) {
-                        if (isr == null) {
-                            throw new IllegalStateException("Encountered FIR2 line not preceeded by DIG2 line!");
-                        }
-                        Fir fir = readIDCFir(line, isr, sc);
-                        result = doFir(nfr, startFrequency, endFrequency, fir);
 
-                    }
-
-                    /*
-                     * Cascade individual group responses
-                     */
-                    for (int j = 0; j < result.length; j++) {
-                        cascade[j].a *= result[j].a;
-                        cascade[j].p += result[j].p;
-                    }
-                }
+            /*
+             * Cascade individual group responses
+             */
+            for (int j = 0; j < result.length; j++) {
+                cascade[j].a *= result[j].a;
+                cascade[j].p += result[j].p;
             }
         }
 
@@ -142,6 +138,316 @@ public class NDCTransfer {
             xre[j] = c.getReal();
             xim[j] = c.getImaginary();
         }
+    }
+
+    public static List<GroupStage> computeGroupStagesFromFile(File respFile) throws FileNotFoundException {
+        List<GroupStage> stages = new ArrayList<>();
+        Scanner sc = new Scanner(respFile);
+        Double isr = null;
+
+        //Check for any known comments that are actually metadata fields
+        //and make sure we haven't see a new comment block since the last 
+        //'real' stage
+        boolean commentedElements = false;
+
+        double sampleRate = 0;
+        int decimation = 1;
+        double gain = 1;
+        double normalization = 0;
+        double delay = 0;
+
+        while (sc.hasNextLine()) {
+            String line = sc.nextLine();
+            if (line == null || line.trim().isEmpty()) {
+                continue;
+            }
+            if ((line.charAt(0) != '#') && (line.contains("theoretical") || line.contains("measured"))) {
+                GroupStage groupStage = new GroupStage(sampleRate, decimation, gain, normalization, delay);
+                if (line.contains("paz")) {
+                    stages.add(groupStage.setPaz(readNDCpaz(sc)));
+                } else if (line.contains("PAZ2")) {
+                    stages.add(groupStage.setPaz(readIDCpaz(line, sc)));
+                } else if (line.contains("fap")) {
+                    stages.add(groupStage.setFap(readFap(sc)));
+                } else if (line.contains("FAP2")) {
+                    stages.add(groupStage.setFap(readIDCFap(line, sc)));
+                } else if (line.contains("fir")) {
+                    stages.add(groupStage.setFir(readFir(sc)));
+                } else if (line.contains("DIG2")) {
+                    isr = processDig2Line(line);
+                    continue;
+                } else if (line.contains("FIR2")) {
+                    if (isr == null) {
+                        throw new IllegalStateException("Encountered FIR2 line not preceeded by DIG2 line!");
+                    }
+                    stages.add(groupStage.setFir(readIDCFir(line, isr, sc)));
+                }
+                if (commentedElements) {
+                    commentedElements = false;
+                    sampleRate = 0;
+                    decimation = 1;
+                    gain = 1;
+                    normalization = 0;
+                    delay = 0;
+                }
+            } else if (line.contains("Freq(Hz)     Amp(counts/nm)   Phase(deg)")) {
+                GroupStage groupStage = new GroupStage(sampleRate, decimation, gain, normalization, delay);
+                stages.add(groupStage.setFap(readFap(sc)));
+            } else if (line.charAt(0) == '#') {
+                try {
+                    commentedElements = true;
+                    String[] tokens = line.trim().replaceAll("\\s+", " ").split(" ");
+                    // tokens[0] is the # character.
+                    if (line.contains("input sample interval")) {
+                        if (tokens[1].matches(NUMBER)) {
+                            //0.0                 input sample interval
+                            Double interval = Double.valueOf(tokens[1]);
+                            if (interval != 0.0) {
+                                interval = 1.0 / interval;
+                            }
+                            sampleRate = interval;
+                        } else {
+                            // input sample interval 1.0E-03 
+                            if (tokens.length >= 5) {
+                                String tmp = tokens[4];
+                                if (tmp.matches(NUMBER)) {
+                                    Double interval = Double.valueOf(tmp);
+                                    if (interval != 0.0) {
+                                        interval = 1.0 / interval;
+                                    }
+                                    sampleRate = interval;
+                                }
+                            }
+                        }
+                    }
+                    if (line.contains("decim factor")) {
+                        // 1                   decim factor
+                        String tmp = tokens[1];
+                        if (tmp.matches(NUMBER)) {
+                            decimation = Integer.parseInt(tokens[1]);
+                        }
+                    }
+                    if (line.contains("decimal factor") && tokens.length >= 4) {
+                        // decimal factor        5
+                        String tmp = tokens[3];
+                        if (tmp.matches(NUMBER)) {
+                            decimation = Integer.parseInt(tmp);
+                        }
+                    }
+                    if (line.contains("decimation factor")) {
+                        // 2 decimation factor delay=3.22 
+                        String tmp = tokens[1];
+                        if (tmp.matches(NUMBER)) {
+                            decimation = Integer.parseInt(tmp);
+                        }
+                    }
+                    if (line.contains("delay=")) {
+                        // 2 decimation factor delay=3.22 
+                        String[] delayTokens = line.split("=");
+                        if (delayTokens.length == 2 && delayTokens[1].matches(NUMBER)) {
+                            delay = Double.parseDouble(line.split("=")[1]);
+                        }
+                    }
+                    if (line.contains("normalization factor") && tokens.length >= 4) {
+                        if (tokens[1].matches(NUMBER)) {
+                            // 1.0                 normalization factor
+                            normalization = Double.parseDouble(tokens[1]);
+                        } else {
+                            // normalization factor  1.0 
+                            String tmp = tokens[tokens.length - 1];
+                            if (tmp.matches(NUMBER)) {
+                                normalization = Double.parseDouble(tmp);
+                            }
+                        }
+                    }
+
+                    if (line.contains("gain")) {
+                        if (tokens[1].matches(NUMBER)) {
+                            // 1.0                 gain
+                            gain = Double.parseDouble(tokens[1]);
+                        } else {
+                            // gain factor       1.0 
+                            String tmp = tokens[tokens.length - 1];
+                            if (tmp.matches(NUMBER)) {
+                                gain = Double.parseDouble(tmp);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    String msg = String.format("Error attempting to parse response comment line %s, %s", line, e.getMessage());
+                    Logger.getLogger("NDCTransfer").log(Level.WARNING, msg);
+                }
+            }
+        }
+
+        return stages;
+    }
+
+    public static List<Stage> computeTransferStagesFromFile(File respFile) throws FileNotFoundException {
+        NDCUnitsParser parser = new NDCUnitsParser();
+        ResponseUnits units = parser.getResponseUnits(respFile);
+        return computeTransferStages(units, computeGroupStagesFromFile(respFile));
+    }
+
+    public static List<Stage> computeTransferStages(ResponseUnits units, List<GroupStage> groupStages) throws FileNotFoundException {
+        List<Stage> stages = new ArrayList<>();
+        for (GroupStage stage : groupStages) {
+            Stage respStage = null;
+            if (stage.getPaz() != null) {
+                respStage = pazToStage(units, stage.getPaz());
+            } else if (stage.getFap() != null) {
+                respStage = fapToStage(units, stage.getFap());
+            } else if (stage.getFir() != null) {
+                respStage = firToStage(units, stage.getFir());
+            }
+            if (respStage != null) {
+                //Required fields
+                if (respStage.the_decimation == null) {
+                    respStage.the_decimation = new Decimation[1];
+                    Decimation decimation = new Decimation();
+                    decimation.factor = stage.getDecimation();
+                    decimation.offset = 0;
+                    decimation.estimated_delay = new QuantityImpl(stage.getDelay(), UnitImpl.HERTZ);
+                    decimation.input_rate = new SamplingImpl((int) stage.getSampleRate(), new TimeInterval(1, UnitImpl.SECOND));
+                    decimation.correction_applied = new QuantityImpl(0, UnitImpl.COUNT);
+                    respStage.the_decimation[0] = decimation;
+                }
+                if (respStage.the_gain == null) {
+                    respStage.the_gain = new Gain();
+                    respStage.the_gain.frequency = 1;
+                    respStage.the_gain.gain_factor = 1;
+                }
+                if (respStage.the_normalization == null && stage.getNormalization() != 0.0) {
+                    respStage.the_normalization = new Normalization[1];
+                    Normalization normalization = new Normalization();
+                    normalization.ao_normalization_factor = (float) stage.getNormalization();
+                    normalization.normalization_freq = 0;
+                    respStage.the_normalization[0] = normalization;
+                }
+                stages.add(respStage);
+            }
+        }
+        return stages;
+    }
+
+    private static Stage firToStage(ResponseUnits units, Fir fir) {
+        Stage stage = new Stage();
+        Filter[] filters = new Filter[1];
+        Filter firFilter = new Filter();
+        CoefficientFilter coef = new CoefficientFilter();
+        if (UnitsStatus.UNDETERMINED == units.getUnitsStatus()) {
+            //For the NDC transfer types if its not defined we assume
+            //counts for FIRs
+            stage.input_units = UnitImpl.COUNT;
+        } else {
+            stage.input_units = units.getUnitObj();
+        }
+        stage.output_units = stage.input_units;
+
+        coef.numerator = new CoefficientErrored[fir.getNu().length];
+        for (int i = 0; i < fir.getNu().length; i++) {
+            coef.numerator[i] = new CoefficientErrored((float) fir.getNu()[i], 0f);
+        }
+
+        if (coef.numerator.length % 2 == 0) {
+            //Marks as an "EVEN" filter type
+            stage.type = TransferType.DIGITAL;
+        } else {
+            //Assume odd otherwise, in theory we could check for symmetry as well.
+            stage.type = TransferType.ANALOG;
+        }
+
+        //Denominators technically exist in the files but are always zero
+        //and that's how upstream processing knows this is a FIR filter
+        //and not a raw coefficient filter. Stupid I know, but I don't
+        //make the rules.
+        coef.denominator = new CoefficientErrored[0];
+        //coef.denominator = new CoefficientErrored[fir.getDe().length];
+        //for (int i = 0; i < fir.getDe().length; i++) {
+        //    coef.denominator[i] = new CoefficientErrored((float) fir.getDe()[i], 0f);
+        //}
+
+        firFilter.coeff_filter(coef);
+        filters[0] = firFilter;
+        stage.filters = filters;
+
+        return stage;
+    }
+
+    private static Stage fapToStage(ResponseUnits units, Fap[] fap) {
+        Stage stage = new Stage();
+        Filter[] filters = new Filter[1];
+        Filter fapFilter = new Filter();
+
+        ListFilter filt = new ListFilter();
+        if (UnitsStatus.UNDETERMINED == units.getUnitsStatus()) {
+            //For the NDC transfer types if its not defined we assume
+            //counts for FAPs
+            stage.input_units = UnitImpl.COUNT;
+        } else {
+            stage.input_units = units.getUnitObj();
+        }
+        stage.output_units = stage.input_units;
+
+        //TODO: Check assumed units here with SMEs
+        filt.phase_unit = UnitImpl.DEGREE;
+        filt.frequency_unit = UnitImpl.HERTZ;
+        filt.amplitude = new float[fap.length];
+        filt.amplitude_error = new float[fap.length];
+        filt.phase = new float[fap.length];
+        filt.phase_error = new float[fap.length];
+        filt.frequency = new float[fap.length];
+        for (int i = 0; i < fap.length; i++) {
+            filt.amplitude[i] = (float) fap[i].getA();
+            filt.amplitude_error[i] = (float) fap[i].getAe();
+            filt.phase[i] = (float) fap[i].getP();
+            filt.phase_error[i] = (float) fap[i].getPe();
+            filt.frequency[i] = (float) fap[i].getF();
+        }
+
+        fapFilter.list_filter(filt);
+        filters[0] = fapFilter;
+        stage.filters = filters;
+        return stage;
+    }
+
+    private static Stage pazToStage(ResponseUnits units, Paz paz) {
+        Stage stage = new Stage();
+        Filter[] filters = new Filter[1];
+        Filter firFilter = new Filter();
+        PoleZeroFilter filt = new PoleZeroFilter();
+
+        if (UnitsStatus.UNDETERMINED == units.getUnitsStatus()) {
+            //For the NDC transfer types if its not defined we assume
+            //m/s and counts for pole zeros
+            stage.input_units = UnitImpl.COUNT;
+        } else {
+            stage.input_units = units.getUnitObj();
+        }
+        stage.output_units = UnitImpl.METER_PER_SECOND;
+
+        stage.type = TransferType.LAPLACE;
+
+        stage.the_normalization = new Normalization[1];
+        stage.the_normalization[0] = new Normalization();
+        stage.the_normalization[0].ao_normalization_factor = (float) paz.getNormFactor();
+        //TODO: Do we need to calculate this? Needs checked. Appears to be 1 everywhere I've checked.
+        stage.the_normalization[0].normalization_freq = 1f;
+
+        filt.poles = new ComplexNumberErrored[paz.getPoles().length];
+        for (int i = 0; i < paz.getPoles().length; i++) {
+            filt.poles[i] = new ComplexNumberErrored((float) paz.getPoles()[i].getZ().getReal(), 0f, (float) paz.getPoles()[i].getZ().getImaginary(), 0f);
+        }
+
+        filt.zeros = new ComplexNumberErrored[paz.getZeros().length];
+        for (int i = 0; i < paz.getZeros().length; i++) {
+            filt.zeros[i] = new ComplexNumberErrored((float) paz.getZeros()[i].getZ().getReal(), 0f, (float) paz.getZeros()[i].getZ().getImaginary(), 0f);
+        }
+
+        firFilter.pole_zero_filter(filt);
+        filters[0] = firFilter;
+        stage.filters = filters;
+        return stage;
     }
 
     private static double readNormFactor(Scanner sc) {
@@ -190,6 +496,9 @@ public class NDCTransfer {
 
     private static Fap[] readFap(Scanner sc) {
         String line = sc.nextLine();
+        while (line.trim().equals("#")) {
+            line = sc.nextLine();
+        }
 
         int linesLeft = getFirstInt(line);
         Fap[] results = new Fap[linesLeft];
@@ -253,8 +562,7 @@ public class NDCTransfer {
 
             linesLeft--;
         }
-        String msg = String.format("Created FIR with ISR = %f and %d coeficients. Sum of coefficients is %f",
-                isr, numCoefficients, sum);
+        String msg = String.format("Created FIR with ISR = %f and %d coeficients. Sum of coefficients is %f", isr, numCoefficients, sum);
         Logger.getLogger("NDCTransfer").log(Level.FINE, msg);
 
         return fir;
@@ -286,8 +594,7 @@ public class NDCTransfer {
         }
 
         fir.setDenominator(0);
-        String msg = String.format("Created FIR with ISR = %f and %d coeficients. Sum of coefficients is %f",
-                isr, numCoefficients, sum);
+        String msg = String.format("Created FIR with ISR = %f and %d coeficients. Sum of coefficients is %f", isr, numCoefficients, sum);
         Logger.getLogger("NDCTransfer").log(Level.FINE, msg);
         return fir;
     }
@@ -319,13 +626,13 @@ public class NDCTransfer {
             result[j] = new Polar(0.0, 1.0);
 
             for (int i = 0; i < zeros.length; i++) {
-                Polar polar = topolar(-zeros[i].z.getReal(), (omega - zeros[i].z.getImaginary()));
+                Polar polar = topolar(-zeros[i].getZ().getReal(), (omega - zeros[i].getZ().getImaginary()));
                 result[j].a *= polar.a;
                 result[j].p += polar.p;
             }
 
             for (int i = 0; i < poles.length; i++) {
-                Polar polar = topolar(-poles[i].z.getReal(), (omega - poles[i].z.getImaginary()));
+                Polar polar = topolar(-poles[i].getZ().getReal(), (omega - poles[i].getZ().getImaginary()));
                 if (polar.a != 0.0) {
                     result[j].a /= polar.a;
                 }
@@ -336,18 +643,15 @@ public class NDCTransfer {
         return result;
     }
 
-    private static Polar[] processNDCpaz(Scanner sc, Polar[] result, int nfr, double start_fr, double end_fr) {
+    private static Paz readNDCpaz(Scanner sc) {
         double normFactor = readNormFactor(sc);
         DComplex[] poles = readDComplex(sc);
         DComplex[] zeros = readDComplex(sc);
-        result = doPaz(nfr, start_fr, end_fr, poles, zeros);
-        for (int j = 0; j < nfr; j++) {
-            result[j].a *= normFactor;
-        }
-        return result;
+        Paz paz = new Paz(poles, zeros, normFactor);
+        return paz;
     }
 
-    private static Polar[] processIDCpaz(String line, Scanner sc, Polar[] result, int nfr, double startFrequency, double endFrequency) {
+    private static Paz readIDCpaz(String line, Scanner sc) {
         String[] tokens = line.split("\\s+");
         if (tokens.length < 8) {
             throw new IllegalStateException("Expected PAZ2 line to have at least 8 tokens, but line is: " + line + "!");
@@ -357,9 +661,14 @@ public class NDCTransfer {
         int numZeros = Integer.parseInt(tokens[7]);
         DComplex[] poles = readDComplexIDC(sc, numPoles);
         DComplex[] zeros = readDComplexIDC(sc, numZeros);
-        result = doPaz(nfr, startFrequency, endFrequency, poles, zeros);
+        Paz paz = new Paz(poles, zeros, normFactor);
+        return paz;
+    }
+
+    private static Polar[] processPaz(int nfr, double start_fr, double end_fr, Paz paz) {
+        Polar[] result = doPaz(nfr, start_fr, end_fr, paz.getPoles(), paz.getZeros());
         for (int j = 0; j < nfr; j++) {
-            result[j].a *= normFactor;
+            result[j].a *= paz.getNormFactor();
         }
         return result;
     }
@@ -511,9 +820,7 @@ public class NDCTransfer {
         /*
          * Set up data in a large array
          */
-        for (int i = 0; i < firs.nnc; i++) {
-            xr[i] = firs.nu[i];
-        }
+        System.arraycopy(firs.nu, 0, xr, 0, firs.nnc);
         for (int i = firs.nnc; i < faps.length * 2; i++) {
             xr[i] = 0.0;
         }
@@ -554,9 +861,7 @@ public class NDCTransfer {
             /*
              * Set up data in a large array
              */
-            for (int i = 0; i < firs.ndc; i++) {
-                xr[i] = firs.de[i];
-            }
+            System.arraycopy(firs.de, 0, xr, 0, firs.ndc);
             for (int i = firs.ndc; i < faps.length * 2; i++) {
                 xr[i] = 0.0;
             }
@@ -681,7 +986,6 @@ public class NDCTransfer {
         /*
          * need to build imaginary array
          */
-        npts = 1;
         n2 = 1;
 
         npts = 1;
@@ -701,7 +1005,6 @@ public class NDCTransfer {
                 xr[i] = xr[k];
             }
             for (i = 0; i <= npts / 2; i++) {
-                k = i * 2;
                 xi[npts - i] = -xi[i];
                 xr[npts - i] = xr[i];
             }
@@ -830,78 +1133,4 @@ public class NDCTransfer {
         matcher.find();
         return Integer.parseInt(matcher.group());
     }
-
-    private static class DComplex {
-
-        public final Complex z;
-        public final Complex e;
-
-        public DComplex(Complex z, Complex e) {
-            this.z = z;
-            this.e = e;
-        }
-    }
-
-    private static class Fap {
-
-        public double f;
-        public double a;
-        public double p;
-        public double ae;
-        public double pe;
-
-        public Fap(double f, double a, double p, double ae, double pe) {
-            this.f = f;
-            this.a = a;
-            this.p = p;
-            this.ae = ae;
-            this.pe = pe;
-        }
-    }
-
-    private static class Fir {
-
-        private double isr;
-        public int nnc;
-        public int ndc;
-        public double[] nu;
-        public double[] nue;
-        public double[] de;
-        public double[] dee;
-
-        public Fir(double isr) {
-            this.isr = isr;
-        }
-
-        public void setNumerator(int nnc) {
-            this.nnc = nnc;
-            nu = new double[nnc];
-            nue = new double[nnc];
-        }
-
-        public void setDenominator(int ndc) {
-            this.ndc = ndc;
-            de = new double[ndc];
-            dee = new double[ndc];
-        }
-
-    }
-
-    private static class Polar {
-
-        public double p;
-        public double a;
-
-        public Polar(double p, double a) {
-            this.p = p;
-            this.a = a;
-        }
-
-        @Override
-        public String toString() {
-            return "Polar{" + "p=" + p + ", a=" + a + '}';
-        }
-
-    }
-
 }

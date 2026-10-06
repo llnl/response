@@ -10,9 +10,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,36 +25,28 @@ package gov.llnl.gnem.response;
 import java.io.File;
 import java.io.Serializable;
 import java.util.Objects;
+
 import javax.measure.Unit;
 
 public class ResponseMetaData implements Serializable {
 
     private static final long serialVersionUID = 2470284912740366355L;
 
-    private final String filename;
-    private final ResponseType rsptype;
-    private final Double nominalCalib;
-    private final Double nominalCalper;
-    private final Double sensorCalper;
-    private final Double sensorCalratio;
-    private final Double wfdiscCalib;
-    private final Double wfdiscCalper;
-    private final double time;
-    private final double endtime;
-    private final ResponseMetadataExtension extendedMetadata;
-    private final Double instrumentSampleRate;
+    private String filename;
+    private ResponseType rsptype;
+    private Double nominalCalib;
+    private Double nominalCalper;
+    private Double sensorCalper;
+    private Double sensorCalratio;
+    private Double wfdiscCalib;
+    private Double wfdiscCalper;
+    private double time;
+    private double endtime;
+    private ResponseMetadataExtension extendedMetadata;
+    private Double instrumentSampleRate;
 
-    public ResponseMetaData(String filename,
-            ResponseType rsptype,
-            Double nominalCalib,
-            Double nominalCalper,
-            Double sensorCalper,
-            Double sensorCalratio,
-            Double wfdiscCalib,
-            Double wfdiscCalper,
-            double time,
-            double endtime
-    ) {
+    public ResponseMetaData(String filename, ResponseType rsptype, Double nominalCalib, Double nominalCalper, Double sensorCalper, Double sensorCalratio, Double wfdiscCalib, Double wfdiscCalper,
+            double time, double endtime) {
         this.filename = filename;
         this.rsptype = rsptype;
         this.nominalCalib = nominalCalib;
@@ -69,17 +61,8 @@ public class ResponseMetaData implements Serializable {
         instrumentSampleRate = null;
     }
 
-    public ResponseMetaData(File file,
-            ResponseType rsptype,
-            Double nominalCalib,
-            Double nominalCalper,
-            Double sensorCalper,
-            Double sensorCalratio,
-            Double wfdiscCalib,
-            Double wfdiscCalper,
-            double time,
-            double endtime
-    ) {
+    public ResponseMetaData(File file, ResponseType rsptype, Double nominalCalib, Double nominalCalper, Double sensorCalper, Double sensorCalratio, Double wfdiscCalib, Double wfdiscCalper,
+            double time, double endtime) {
         this.filename = file.getAbsolutePath();
         this.rsptype = rsptype;
         this.nominalCalib = nominalCalib;
@@ -110,18 +93,8 @@ public class ResponseMetaData implements Serializable {
 
     }
 
-    public ResponseMetaData(String filename,
-            ResponseType rsptype,
-            Double nominalCalib,
-            Double nominalCalper,
-            Double sensorCalper,
-            Double sensorCalratio,
-            Double wfdiscCalib,
-            Double wfdiscCalper,
-            double time,
-            double endtime,
-            ResponseMetadataExtension rme,
-            Double instrumentSampleRate) {
+    public ResponseMetaData(String filename, ResponseType rsptype, Double nominalCalib, Double nominalCalper, Double sensorCalper, Double sensorCalratio, Double wfdiscCalib, Double wfdiscCalper,
+            double time, double endtime, ResponseMetadataExtension rme, Double instrumentSampleRate) {
         this.filename = filename;
         this.rsptype = rsptype;
         this.nominalCalib = nominalCalib;
@@ -212,6 +185,71 @@ public class ResponseMetaData implements Serializable {
         }
     }
 
+    boolean hasFullWfdiscCalibration() {
+        return wfdiscCalib != null && wfdiscCalper != null && wfdiscCalper > 0 && rsptype != ResponseType.EVRESP && rsptype != ResponseType.PAZ;
+    }
+
+    boolean hasWfdiscCalibration() {
+        return wfdiscCalib != null && wfdiscCalib != 0 && rsptype != ResponseType.EVRESP && rsptype != ResponseType.PAZ;
+    }
+
+    boolean hasFullNominalCalibration() {
+        return nominalCalib != null && nominalCalper != null && nominalCalper > 0;
+    }
+    
+    boolean hasNominalCalib()
+    {
+        return nominalCalib != null && nominalCalib != 0;
+    }
+
+    public void setFilename(String filename) {
+        this.filename = filename;
+    }
+
+    public void setRsptype(ResponseType rsptype) {
+        this.rsptype = rsptype;
+    }
+
+    public void setNominalCalib(Double nominalCalib) {
+        this.nominalCalib = nominalCalib;
+    }
+
+    public void setNominalCalper(Double nominalCalper) {
+        this.nominalCalper = nominalCalper;
+    }
+
+    public void setSensorCalper(Double sensorCalper) {
+        this.sensorCalper = sensorCalper;
+    }
+
+    public void setSensorCalratio(Double sensorCalratio) {
+        this.sensorCalratio = sensorCalratio;
+    }
+
+    public void setWfdiscCalib(Double wfdiscCalib) {
+        this.wfdiscCalib = wfdiscCalib;
+    }
+
+    public void setWfdiscCalper(Double wfdiscCalper) {
+        this.wfdiscCalper = wfdiscCalper;
+    }
+
+    public void setTime(double time) {
+        this.time = time;
+    }
+
+    public void setEndtime(double endtime) {
+        this.endtime = endtime;
+    }
+
+    public void setExtendedMetadata(ResponseMetadataExtension extendedMetadata) {
+        this.extendedMetadata = extendedMetadata;
+    }
+
+    public void setInstrumentSampleRate(Double instrumentSampleRate) {
+        this.instrumentSampleRate = instrumentSampleRate;
+    }
+
     @Override
     public int hashCode() {
         int hash = 3;
@@ -283,15 +321,31 @@ public class ResponseMetaData implements Serializable {
 
     @Override
     public String toString() {
-        return "ResponseMetaData{" + "filename=" + filename + ", rsptype=" + rsptype + ", nominalCalib=" + nominalCalib + ", nominalCalper=" + nominalCalper + ", sensorCalper=" + sensorCalper + ", sensorCalratio=" + sensorCalratio + ", wfdiscCalib=" + wfdiscCalib + ", wfdiscCalper=" + wfdiscCalper + ", time=" + time + ", endtime=" + endtime + ", extendedMetadata=" + extendedMetadata + ", instrumentSampleRate=" + instrumentSampleRate + '}';
+        return "ResponseMetaData{"
+                + "filename="
+                + filename
+                + ", rsptype="
+                + rsptype
+                + ", nominalCalib="
+                + nominalCalib
+                + ", nominalCalper="
+                + nominalCalper
+                + ", sensorCalper="
+                + sensorCalper
+                + ", sensorCalratio="
+                + sensorCalratio
+                + ", wfdiscCalib="
+                + wfdiscCalib
+                + ", wfdiscCalper="
+                + wfdiscCalper
+                + ", time="
+                + time
+                + ", endtime="
+                + endtime
+                + ", extendedMetadata="
+                + extendedMetadata
+                + ", instrumentSampleRate="
+                + instrumentSampleRate
+                + '}';
     }
-
-    boolean hasWfdiscCalibration() {
-       return wfdiscCalib != null && wfdiscCalper != null && wfdiscCalper > 0 && rsptype != ResponseType.EVRESP && rsptype != ResponseType.PAZ;
-    }
-
-    boolean hasNominalCalibration() {
-      return nominalCalib != null && nominalCalper != null && nominalCalper > 0;
-     }
-
 }

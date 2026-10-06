@@ -1,4 +1,4 @@
-/*-
+ /*-
  * #%L
  * Seismic Response Processing Module
  *  LLNL-CODE-856351
@@ -60,6 +60,9 @@ public class NDCUnitsParser {
                     if (tmp.contains("nm/count")) {
                         return new ResponseUnits(MetricPrefix.NANO(METRE), UnitImpl.NANOMETER, UnitsStatus.QUANTITY_AND_UNITS);
                     }
+                    if (tmp.contains("nanometer")) {
+                        return new ResponseUnits(MetricPrefix.NANO(METRE), UnitImpl.NANOMETER, UnitsStatus.QUANTITY_AND_UNITS);
+                    }
                     if (tmp.contains("m/s^2") || tmp.contains("mps^2") || tmp.contains("m/s/s")) {
                         return new ResponseUnits(METRE_PER_SQUARE_SECOND, UnitImpl.METER_PER_SECOND_PER_SECOND, UnitsStatus.QUANTITY_AND_UNITS);
                     }
@@ -81,9 +84,9 @@ public class NDCUnitsParser {
                     if (tmp.contains("counts/pa") || tmp.contains("counts/(pa)") || tmp.contains("pa/count")) {
                         return new ResponseUnits(PASCAL, UnitImpl.PASCAL, UnitsStatus.QUANTITY_AND_UNITS);
                     }
-                    if (tmp.contains("inch/second")) {
-                        return new ResponseUnits(ResponseUnits.INCH_PER_SECOND, UnitImpl.VELOCITY, UnitsStatus.QUANTITY_AND_UNITS);
-                    }
+//                    if (tmp.contains("inch/second")) {
+//                        return new ResponseUnits(ResponseUnits.INCH_PER_SECOND, UnitImpl.VELOCITY, UnitsStatus.QUANTITY_AND_UNITS);
+//                    }
 
                 }
 
